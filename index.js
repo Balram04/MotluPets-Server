@@ -9,18 +9,52 @@ const adminRoutes = require('./Routes/adminRoutes');
 
 // CORS configuration
 const corsOptions = {
-  origin: [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000',
-    process.env.FRONTEND_URL
-  ].filter(Boolean), // Remove any undefined values
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://localhost:3000',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    // Log for debugging
+    console.log('🌐 Request origin:', origin);
+    console.log('✅ Allowed origins:', allowedOrigins);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('❌ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  optionSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
+
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path} from ${req.get('origin') || 'no-origin'}`);
+  next();
+});
+
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'DogHub API is running!', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
