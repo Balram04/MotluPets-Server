@@ -22,6 +22,9 @@ RAZORPAY_KEY_SECRET=your_razorpay_secret_key_here
 PORT=10000
 NODE_ENV=production
 
+# Frontend URL (for CORS)
+FRONTEND_URL=https://your-app-name.vercel.app
+
 # Instructions:
 # 1. Go to your Render service dashboard
 # 2. Click on "Environment" tab
