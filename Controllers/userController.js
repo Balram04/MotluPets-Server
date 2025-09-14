@@ -48,7 +48,7 @@ module.exports = {
 
     // Generate OTP and set expiry (2 minutes from now)
     const otp = generateOTP();
-    const otpExpiry = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+    const otpExpiry = new Date(Date.now() + 3* 60 * 1000); // 2 minutes
     const hashedPassword = await bcrypt.hash(password, 10);
 
     try {
@@ -164,7 +164,7 @@ module.exports = {
 
       // Generate new OTP
       const otp = generateOTP();
-      const otpExpiry = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+      const otpExpiry = new Date(Date.now() + 3* 60 * 1000); // 2 minutes
 
       // Send new OTP email
       await sendVerificationOTP(email, user.name, otp);
@@ -180,7 +180,7 @@ module.exports = {
 
       res.status(200).json({
         status: 'success',
-        message: 'New verification code sent! Please check your email. The code will expire in 2 minutes.',
+        message: 'New verification code sent! Please check your email. The code will expire in 3 minutes.',
       });
 
     } catch (error) {
@@ -199,7 +199,10 @@ module.exports = {
     try {
       const user = await User.findOne({ email });
       if (!user) {
-        return res.status(401).json({ message: 'Email not found. Please register.' });
+        return res.status(404).json({ 
+          message: 'Email not registered. Please sign up to create an account.',
+          requiresRegistration: true 
+        });
       }
 
       if (!user.isVerified) {

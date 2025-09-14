@@ -338,7 +338,7 @@ const sendVerificationOTP = async (email, name, otp) => {
               </div>
               
               <div class="warning">
-                ⏰ This code will expire in 2 minutes for security reasons.
+                ⏰ This code will expire in 3 minutes for security reasons.
               </div>
               
               <p><strong>Important Security Notes:</strong></p>
