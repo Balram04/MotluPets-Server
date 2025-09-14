@@ -7,7 +7,9 @@ const { upload, uploadToCloudinary } = require('../Middleware/uploadMiddleware')
 
 router
   .post('/login', tryCatch(controller.login))
-  .use(checkAuth(process.env.ADMIN_ACCESS_TOKEN_SECRET))
+  .post('/logout', tryCatch(controller.logout))
+  .post('/refresh-token', tryCatch(controller.refreshToken))
+  .use(checkAuth()) // Updated to use new cookie-based auth
 
   .get('/users', tryCatch(controller.getAllUsers))
   .get('/users/:id', tryCatch(controller.getUserById))

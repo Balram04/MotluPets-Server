@@ -7,6 +7,13 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const { 
+  generateAccessToken, 
+  generateRefreshToken, 
+  hashRefreshToken, 
+  setTokenCookies,
+  clearTokenCookies 
+} = require('../Utils/jwtUtils');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -14,6 +21,15 @@ const razorpay = new Razorpay({
 });
 
 let orderDetails = {};
+
+// Helper function to check if authenticated user can access the requested user's data
+const checkUserAccess = (req, res, requestedUserId) => {
+  if (req.user.userId.toString() !== requestedUserId) {
+    res.status(403).json({ message: 'Access denied. You can only access your own data.' });
+    return false;
+  }
+  return true;
+};
 
 module.exports = {
   register: async (req, res) => {
@@ -179,40 +195,139 @@ module.exports = {
       return res.status(400).json({ message: error.details[0].message });
     }
     const { email, password } = value;
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Email not found. Please register.' });
-    }
+    
+    try {
+      const user = await User.findOne({ email });
+      if (!user) {
+        return res.status(401).json({ message: 'Email not found. Please register.' });
+      }
 
-    if (!user.isVerified) {
-      return res.status(401).json({ 
-        message: 'Please verify your email before logging in. Check your inbox for the verification code.',
-        requiresVerification: true,
-        email: email
-      });
-    }
+      if (!user.isVerified) {
+        return res.status(401).json({ 
+          message: 'Please verify your email before logging in. Check your inbox for the verification code.',
+          requiresVerification: true,
+          email: email
+        });
+      }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      return res.status(401).json({ message: 'Incorrect Password. Try again.' });
-    }
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) {
+        return res.status(401).json({ message: 'Incorrect Password. Try again.' });
+      }
 
-    const accessToken = jwt.sign({ email }, process.env.USER_ACCESS_TOKEN_SECRET, { expiresIn: '10m' });
-    const refreshToken = jwt.sign({ email }, process.env.USER_REFRESH_TOKEN_SECRET, { expiresIn: '3d' });
+      // Generate tokens
+      const tokenPayload = { email: user.email, userId: user._id };
+      const accessToken = generateAccessToken(tokenPayload);
+      const refreshToken = generateRefreshToken(tokenPayload);
 
-    res
-      .status(200)
-      .cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        sameSite: 'none',
-        path: '/',
-        maxAge: 3 * 24 * 60 * 60 * 1000,
-      })
-      .json({
+      // Hash and store refresh token in database
+      const hashedRefreshToken = await hashRefreshToken(refreshToken);
+      await User.findByIdAndUpdate(user._id, { refreshToken: hashedRefreshToken });
+
+      // Set HTTP-only cookies
+      setTokenCookies(res, accessToken, refreshToken);
+
+      res.status(200).json({
         status: 'success',
         message: 'Successfully Logged In.',
-        data: { jwt_token: accessToken, name: user.name, userID: user._id },
+        data: { 
+          name: user.name, 
+          userID: user._id,
+          email: user.email 
+        },
       });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ message: 'Login failed. Please try again.' });
+    }
+  },
+
+  refreshToken: async (req, res) => {
+    try {
+      const { refreshToken } = req.cookies;
+      
+      if (!refreshToken) {
+        return res.status(401).json({ message: 'Refresh token not provided' });
+      }
+
+      // Verify refresh token
+      const { verifyRefreshToken, compareRefreshToken } = require('../Utils/jwtUtils');
+      const decoded = verifyRefreshToken(refreshToken);
+      
+      // Find user and verify stored refresh token
+      const user = await User.findOne({ email: decoded.email });
+      if (!user || !user.refreshToken) {
+        return res.status(401).json({ message: 'Invalid refresh token' });
+      }
+
+      // Compare refresh token with stored hashed version
+      const isValidRefreshToken = await compareRefreshToken(refreshToken, user.refreshToken);
+      if (!isValidRefreshToken) {
+        return res.status(401).json({ message: 'Invalid refresh token' });
+      }
+
+      // Generate new tokens
+      const tokenPayload = { email: user.email, userId: user._id };
+      const newAccessToken = generateAccessToken(tokenPayload);
+      const newRefreshToken = generateRefreshToken(tokenPayload);
+
+      // Update stored refresh token
+      const hashedRefreshToken = await hashRefreshToken(newRefreshToken);
+      await User.findByIdAndUpdate(user._id, { refreshToken: hashedRefreshToken });
+
+      // Set new cookies
+      setTokenCookies(res, newAccessToken, newRefreshToken);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Tokens refreshed successfully',
+        data: {
+          name: user.name,
+          userID: user._id,
+          email: user.email
+        }
+      });
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+  },
+
+  logout: async (req, res) => {
+    try {
+      const { refreshToken } = req.cookies;
+      
+      if (refreshToken) {
+        // Verify and find user to invalidate refresh token
+        const { verifyRefreshToken } = require('../Utils/jwtUtils');
+        try {
+          const decoded = verifyRefreshToken(refreshToken);
+          await User.findOneAndUpdate(
+            { email: decoded.email }, 
+            { refreshToken: null }
+          );
+        } catch (error) {
+          // Token might be invalid, but we still want to clear cookies
+          console.log('Invalid refresh token during logout:', error.message);
+        }
+      }
+
+      // Clear cookies
+      clearTokenCookies(res);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Successfully logged out'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if there's an error, clear cookies
+      clearTokenCookies(res);
+      res.status(200).json({
+        status: 'success',
+        message: 'Successfully logged out'
+      });
+    }
   },
 
   getAllProducts: async (req, res) => {
@@ -262,6 +377,10 @@ module.exports = {
 
   showCart: async (req, res) => {
     const userID = req.params.id;
+    
+    // Security check: ensure the authenticated user can only access their own cart
+    if (!checkUserAccess(req, res, userID)) return;
+
     const user = await User.findById(userID).populate('cart.product');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -286,6 +405,10 @@ module.exports = {
 
   addToCart: async (req, res) => {
     const userID = req.params.id;
+    
+    // Security check: ensure the authenticated user can only modify their own cart
+    if (!checkUserAccess(req, res, userID)) return;
+
     const user = await User.findById(userID);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -762,6 +885,9 @@ module.exports = {
     const userID = req.params.id;
     
     try {
+      // Security check: ensure the authenticated user can only access their own orders
+      if (!checkUserAccess(req, res, userID)) return;
+
       const user = await User.findById(userID);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });

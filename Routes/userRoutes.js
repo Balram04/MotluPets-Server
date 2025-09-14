@@ -9,6 +9,8 @@ router
   .post('/verify-otp', tryCatch(controller.verifyOTP))
   .post('/resend-otp', tryCatch(controller.resendOTP))
   .post('/login', tryCatch(controller.login))
+  .post('/refresh-token', tryCatch(controller.refreshToken))
+  .post('/logout', tryCatch(controller.logout))
 
   .post('/:id/payment', tryCatch(controller.payment))
   .post('/:id/cod-order', tryCatch(controller.createCodOrder))
@@ -21,7 +23,8 @@ router
   .get('/products/:id', tryCatch(controller.getProductById))
   .get('/products/category/:categoryname', tryCatch(controller.getProductsByCategory))
 
-  // .use(checkAuth(process.env.USER_ACCESS_TOKEN_SECRET))
+  // Protected routes - require authentication
+  .use(checkAuth())
 
   .get('/:id/cart', tryCatch(controller.showCart))
   .post('/:id/cart', tryCatch(controller.addToCart))

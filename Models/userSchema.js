@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false },
   emailVerificationOTP: { type: String, default: null },
   otpExpiry: { type: Date, default: null },
+  refreshToken: { type: String, default: null }, // Store hashed refresh token
   cart: [
     {
       product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },

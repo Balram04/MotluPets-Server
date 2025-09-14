@@ -2,23 +2,104 @@ const { User } = require('../Models/userSchema');
 const { Product, productValidationSchema } = require('../Models/productSchema');
 const Order = require('../Models/orderSchema');
 const jwt = require('jsonwebtoken');
+const { 
+  generateAccessToken, 
+  generateRefreshToken, 
+  verifyRefreshToken,
+  compareRefreshToken,
+  hashRefreshToken,
+  setTokenCookies,
+  clearTokenCookies 
+} = require('../Utils/jwtUtils');
 
 module.exports = {
   login: async (req, res) => {
-    const { email, password } = req.body;
+    try {
+      const { email, password } = req.body;
 
-    if (email === process.env.ADMIN_PANEL_EMAIL && password === process.env.ADMIN_PASSWORD) {
-      const accessToken = jwt.sign({ email }, process.env.ADMIN_ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
-      const refreshToken = jwt.sign({ email }, process.env.USER_REFRESH_TOKEN_SECRET, { expiresIn: '1d' });
-      res.cookie('jwt', refreshToken, { httpOnly: true, maxAge: 3 * 24 * 60 * 60 * 1000 });
+      if (email === process.env.ADMIN_PANEL_EMAIL && password === process.env.ADMIN_PASSWORD) {
+        // Generate tokens for admin
+        const tokenPayload = { email, role: 'admin' };
+        const accessToken = generateAccessToken(tokenPayload);
+        const refreshToken = generateRefreshToken(tokenPayload);
+
+        // For admin, we can store refresh token in a simple way or extend User model to include admin
+        // For now, we'll just use cookies without database storage for admin
+        setTokenCookies(res, accessToken, refreshToken);
+
+        res.status(200).json({
+          status: 'success',
+          message: 'Successfully Logged In.',
+          data: { 
+            name: process.env.ADMIN_NAME || 'Admin',
+            email: email,
+            role: 'admin'
+          },
+        });
+      } else {
+        res.status(401).json({ message: 'Access denied. Incorrect credentials.' });
+      }
+    } catch (error) {
+      console.error('Admin login error:', error);
+      res.status(500).json({ message: 'Login failed. Please try again.' });
+    }
+  },
+
+  refreshToken: async (req, res) => {
+    try {
+      const { refreshToken } = req.cookies;
+      
+      if (!refreshToken) {
+        return res.status(401).json({ message: 'Refresh token not provided' });
+      }
+
+      // Verify refresh token
+      const decoded = verifyRefreshToken(refreshToken);
+      
+      if (decoded.role !== 'admin') {
+        return res.status(401).json({ message: 'Invalid admin refresh token' });
+      }
+
+      // Generate new tokens
+      const tokenPayload = { email: decoded.email, role: 'admin' };
+      const newAccessToken = generateAccessToken(tokenPayload);
+      const newRefreshToken = generateRefreshToken(tokenPayload);
+
+      // Set new cookies
+      setTokenCookies(res, newAccessToken, newRefreshToken);
 
       res.status(200).json({
         status: 'success',
-        message: 'Successfully Logged In.',
-        data: { jwt_token: accessToken, name: process.env.ADMIN_NAME },
+        message: 'Admin tokens refreshed successfully',
+        data: {
+          name: process.env.ADMIN_NAME || 'Admin',
+          email: decoded.email,
+          role: 'admin'
+        }
       });
-    } else {
-      res.status(401).json({ message: 'Access denied. Incorrect password.' });
+    } catch (error) {
+      console.error('Admin token refresh error:', error);
+      res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+  },
+
+  logout: async (req, res) => {
+    try {
+      // Clear cookies
+      clearTokenCookies(res);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Admin successfully logged out'
+      });
+    } catch (error) {
+      console.error('Admin logout error:', error);
+      // Even if there's an error, clear cookies
+      clearTokenCookies(res);
+      res.status(200).json({
+        status: 'success',
+        message: 'Admin successfully logged out'
+      });
     }
   },
 

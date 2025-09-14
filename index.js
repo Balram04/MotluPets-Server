@@ -17,14 +17,28 @@ const corsOptions = {
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'https://localhost:3000',
-      process.env.FRONTEND_URL
+      process.env.FRONTEND_URL,
+      // Allow any Vercel deployment URLs
+      /\.vercel\.app$/,
+      // Allow custom domains
+      process.env.CUSTOM_DOMAIN
     ].filter(Boolean);
     
     // Log for debugging
     console.log('🌐 Request origin:', origin);
     console.log('✅ Allowed origins:', allowedOrigins);
     
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin matches any allowed origin or pattern
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
       console.log('❌ CORS blocked origin:', origin);
