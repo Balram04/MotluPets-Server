@@ -3,13 +3,14 @@ const router = express.Router();
 const controller = require('../Controllers/adminController');
 const tryCatch = require('../Middleware/tryCatch');
 const checkAuth = require('../Middleware/checkAuth');
+const checkAdminAuth = require('../Middleware/checkAdminAuth');
 const { upload, uploadToCloudinary } = require('../Middleware/uploadMiddleware');
 
 router
   .post('/login', tryCatch(controller.login))
   .post('/logout', tryCatch(controller.logout))
   .post('/refresh-token', tryCatch(controller.refreshToken))
-  .use(checkAuth()) // Updated to use new cookie-based auth
+  .use(checkAdminAuth()) // Updated to use admin-specific auth middleware
 
   .get('/users', tryCatch(controller.getAllUsers))
   .get('/users/:id', tryCatch(controller.getUserById))

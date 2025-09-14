@@ -985,7 +985,6 @@ module.exports = {
       console.error('Error cancelling order:', error);
       res.status(500).json({ 
         success: false,
-        message: 'Failed to cancel order',
         error: error.message 
       });
     }
