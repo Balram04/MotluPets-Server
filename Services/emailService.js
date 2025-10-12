@@ -1,22 +1,22 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// Create transporter using Gmail
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+// Configure SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Verify transporter configuration
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Email configuration error:', error);
-  } else {
-    console.log('✅ Email server is ready to send messages');
+// Verify SendGrid configuration
+const verifySendGrid = async () => {
+  try {
+    if (process.env.SENDGRID_API_KEY) {
+      console.log('✅ SendGrid API key configured');
+    } else {
+      console.error('❌ SendGrid API key not found');
+    }
+  } catch (error) {
+    console.error('❌ SendGrid configuration error:', error);
   }
-});
+};
+
+verifySendGrid();
 
 const sendOrderConfirmationEmail = async (orderData) => {
   const { order, user, customerEmail } = orderData;
@@ -235,7 +235,7 @@ const sendOrderConfirmationEmail = async (orderData) => {
     const customerMailOptions = {
       from: {
         name: 'MotluPets',
-        address: process.env.EMAIL_USER
+        email: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER
       },
       to: customerEmail || user.email,
       subject: `Order Confirmation - ${order.orderNumber || order.order_id} - MotluPets`,
@@ -246,29 +246,29 @@ const sendOrderConfirmationEmail = async (orderData) => {
     const adminMailOptions = {
       from: {
         name: 'MotluPets Order System',
-        address: process.env.EMAIL_USER
+        email: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER
       },
       to: process.env.ADMIN_EMAIL,
       subject: `🚨 New Order Alert - ${order.orderNumber || order.order_id} - ₹${total}`,
       html: adminEmailHTML
     };
 
-    // Send both emails
+    // Send both emails using SendGrid
     const [customerResult, adminResult] = await Promise.allSettled([
-      transporter.sendMail(customerMailOptions),
-      transporter.sendMail(adminMailOptions)
+      sgMail.send(customerMailOptions),
+      sgMail.send(adminMailOptions)
     ]);
 
     console.log('📧 Email sending results:');
     
     if (customerResult.status === 'fulfilled') {
-      console.log('✅ Customer email sent successfully:', customerResult.value.messageId);
+      console.log('✅ Customer email sent successfully via SendGrid');
     } else {
       console.error('❌ Customer email failed:', customerResult.reason);
     }
 
     if (adminResult.status === 'fulfilled') {
-      console.log('✅ Admin email sent successfully:', adminResult.value.messageId);
+      console.log('✅ Admin email sent successfully via SendGrid');
     } else {
       console.error('❌ Admin email failed:', adminResult.reason);
     }
@@ -276,8 +276,8 @@ const sendOrderConfirmationEmail = async (orderData) => {
     return {
       customerEmailSent: customerResult.status === 'fulfilled',
       adminEmailSent: adminResult.status === 'fulfilled',
-      customerMessageId: customerResult.status === 'fulfilled' ? customerResult.value.messageId : null,
-      adminMessageId: adminResult.status === 'fulfilled' ? adminResult.value.messageId : null
+      customerMessageId: customerResult.status === 'fulfilled' ? 'sendgrid-success' : null,
+      adminMessageId: adminResult.status === 'fulfilled' ? 'sendgrid-success' : null
     };
 
   } catch (error) {
@@ -297,7 +297,7 @@ const sendVerificationOTP = async (email, name, otp) => {
     const mailOptions = {
       from: {
         name: 'MotluPets',
-        address: process.env.EMAIL_USER
+        email: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER
       },
       to: email,
       subject: 'Verify Your Email - MotluPets Registration',
@@ -368,8 +368,8 @@ const sendVerificationOTP = async (email, name, otp) => {
       `
     };
 
-    const result = await transporter.sendMail(mailOptions);
-    console.log('✅ Verification OTP sent successfully:', result.messageId);
+    const result = await sgMail.send(mailOptions);
+    console.log('✅ Verification OTP sent successfully via SendGrid');
     return result;
 
   } catch (error) {
@@ -382,5 +382,5 @@ module.exports = {
   sendOrderConfirmationEmail,
   sendVerificationOTP,
   generateOTP,
-  transporter
+  sgMail
 };
