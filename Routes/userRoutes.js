@@ -8,6 +8,7 @@ router
   .post('/register', tryCatch(controller.register))
   .post('/verify-otp', tryCatch(controller.verifyOTP))
   .post('/resend-otp', tryCatch(controller.resendOTP))
+  .post('/test-otp-email', tryCatch(controller.testOTPEmail)) // Debug route
   .post('/login', tryCatch(controller.login))
   .post('/refresh-token', tryCatch(controller.refreshToken))
   .post('/logout', tryCatch(controller.logout))

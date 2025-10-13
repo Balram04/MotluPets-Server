@@ -3,21 +3,6 @@ const sgMail = require('@sendgrid/mail');
 // Configure SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Verify SendGrid configuration
-const verifySendGrid = async () => {
-  try {
-    if (process.env.SENDGRID_API_KEY) {
-      console.log('✅ SendGrid API key configured');
-    } else {
-      console.error('❌ SendGrid API key not found');
-    }
-  } catch (error) {
-    console.error('❌ SendGrid configuration error:', error);
-  }
-};
-
-verifySendGrid();
-
 const sendOrderConfirmationEmail = async (orderData) => {
   const { order, user, customerEmail } = orderData;
   
@@ -300,7 +285,34 @@ const sendVerificationOTP = async (email, name, otp) => {
         email: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER
       },
       to: email,
-      subject: 'Verify Your Email - MotluPets Registration',
+      subject: `Your MotluPets verification code: ${otp}`,
+      // Add deliverability headers
+      headers: {
+        'X-Entity-Ref-ID': `motlupets-otp-${Date.now()}`,
+        'X-Priority': '3',
+        'Importance': 'Normal'
+      },
+      // Add categories for SendGrid tracking
+      categories: ['otp', 'user-verification', 'transactional'],
+      // Add plain text version
+      text: `
+Hi ${name},
+
+Welcome to MotluPets!
+
+Your email verification code is: ${otp}
+
+Please enter this code on the verification page to complete your registration.
+
+This code will expire in 10 minutes for security reasons.
+
+If you didn't create an account with MotluPets, please ignore this email.
+
+Best regards,
+The MotluPets Team
+
+Need help? Contact us at support@motlupets.com
+      `,
       html: `
         <!DOCTYPE html>
         <html>
@@ -308,68 +320,69 @@ const sendVerificationOTP = async (email, name, otp) => {
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Email Verification - MotluPets</title>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #fff; padding: 30px 20px; border: 1px solid #ddd; }
-            .otp-box { background: #f8f9fa; border: 2px dashed #667eea; padding: 20px; margin: 20px 0; text-align: center; border-radius: 8px; }
-            .otp-code { font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 5px; margin: 10px 0; }
-            .footer { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 10px 10px; font-size: 14px; color: #666; }
-            .btn { display: inline-block; padding: 12px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; }
-            .warning { color: #e74c3c; font-weight: bold; margin: 15px 0; }
-          </style>
         </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🐾 Welcome to MotluPets!</h1>
-              <p>Email Verification Required</p>
-            </div>
-            
-            <div class="content">
-              <h2>Hi ${name}!</h2>
-              <p>Thank you for registering with MotluPets! To complete your registration and secure your account, please verify your email address using the verification code below:</p>
-              
-              <div class="otp-box">
-                <p style="margin: 0; font-size: 16px; color: #666;">Your Verification Code:</p>
-                <div class="otp-code">${otp}</div>
-                <p style="margin: 0; font-size: 14px; color: #666;">Enter this code on the verification page</p>
-              </div>
-              
-              <div class="warning">
-                ⏰ This code will expire in 3 minutes for security reasons.
-              </div>
-              
-              <p><strong>Important Security Notes:</strong></p>
-              <ul>
-                <li>Never share this code with anyone</li>
-                <li>MotluPets staff will never ask for your verification code</li>
-                <li>If you didn't request this, please ignore this email</li>
-              </ul>
-              
-              <p>Once verified, you'll be able to:</p>
-              <ul>
-                <li>🛒 Shop premium pet products</li>
-                <li>❤️ Save favorites to your wishlist</li>
-                <li>📦 Track your orders easily</li>
-                <li>🎉 Get exclusive offers and updates</li>
-              </ul>
-            </div>
-            
-            <div class="footer">
-              <p><strong>MotluPets</strong> - Your Pet's Happiness, Our Priority</p>
-              <p>Need help? Contact us at support@motlupets.com</p>
-              <p style="font-size: 12px; color: #999;">This is an automated email. Please do not reply directly to this message.</p>
-            </div>
-          </div>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 20px 0; text-align: center;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background-color: #4a90e2; color: white; padding: 30px 40px; text-align: center;">
+                      <h1 style="margin: 0; font-size: 24px;">Welcome to MotluPets</h1>
+                      <p style="margin: 10px 0 0 0; opacity: 0.9;">Email Verification Required</p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <h2 style="color: #333; margin-top: 0;">Hi ${name}!</h2>
+                      <p>Thank you for registering with MotluPets. Please verify your email address using the code below:</p>
+                      
+                      <!-- OTP Box -->
+                      <table role="presentation" style="width: 100%; margin: 30px 0;">
+                        <tr>
+                          <td style="background-color: #f8f9fa; border: 2px solid #4a90e2; padding: 20px; text-align: center; border-radius: 6px;">
+                            <p style="margin: 0; color: #666; font-size: 14px;">Your Verification Code:</p>
+                            <div style="font-size: 28px; font-weight: bold; color: #4a90e2; letter-spacing: 3px; margin: 10px 0;">${otp}</div>
+                            <p style="margin: 0; color: #666; font-size: 12px;">Enter this code to complete verification</p>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="color: #d73502; font-weight: bold; margin: 20px 0;">
+                        This code expires in 10 minutes for your security.
+                      </p>
+                      
+                      <p><strong>Security Notes:</strong></p>
+                      <ul style="margin: 0; padding-left: 20px;">
+                        <li>Do not share this code with anyone</li>
+                        <li>MotluPets will never ask for your verification code</li>
+                        <li>If you did not request this, please ignore this email</li>
+                      </ul>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8f9fa; padding: 30px 40px; text-align: center; color: #666; font-size: 14px;">
+                      <p style="margin: 0 0 10px 0;"><strong>MotluPets</strong></p>
+                      <p style="margin: 0; font-size: 12px;">Need help? Contact support@motlupets.com</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         </body>
         </html>
       `
     };
 
     const result = await sgMail.send(mailOptions);
-    console.log('✅ Verification OTP sent successfully via SendGrid');
+    console.log('Verification OTP sent successfully to:', email);
     return result;
 
   } catch (error) {
@@ -381,6 +394,5 @@ const sendVerificationOTP = async (email, name, otp) => {
 module.exports = {
   sendOrderConfirmationEmail,
   sendVerificationOTP,
-  generateOTP,
-  sgMail
+  generateOTP
 };

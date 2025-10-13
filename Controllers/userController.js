@@ -1,7 +1,7 @@
 const { User, userRegisterSchema, userLoginSchema, otpVerificationSchema } = require('../Models/userSchema');
 const { Product } = require('../Models/productSchema');
 const Order = require('../Models/orderSchema');
-const { sendOrderConfirmationEmail, sendVerificationOTP, generateOTP } = require('../Services/emailService');
+const { sendOrderConfirmationEmail, sendVerificationOTP, generateOTP, testOTPEmail } = require('../Services/emailService');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
@@ -989,6 +989,36 @@ module.exports = {
       res.status(500).json({ 
         success: false,
         error: error.message 
+      });
+    }
+  },
+
+  // Test function for debugging OTP emails
+  testOTPEmail: async (req, res) => {
+    try {
+      const { email, name = 'Test User' } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ 
+          message: 'Email is required for testing' 
+        });
+      }
+
+      console.log('🧪 Testing OTP email for:', email);
+      await testOTPEmail(email, name);
+      
+      res.status(200).json({
+        status: 'success',
+        message: 'Test OTP email sent successfully! Check your inbox and spam folder.',
+        data: { email }
+      });
+
+    } catch (error) {
+      console.error('❌ Test OTP email failed:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to send test OTP email',
+        error: error.message
       });
     }
   },
